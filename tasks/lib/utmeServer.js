@@ -27,6 +27,17 @@ function Server(port, callback) {
         extended: true
     }));
 
+    app.get("/settings", function (req, res) {
+        res.status(200).end();
+        me.emit('loadSettings', req.params.name, function (settings) {
+            if (settings) {
+                res.body(settings).end();
+            } else {
+                res.status(404).end();
+            }
+        });
+    });
+
     app.post("/log", function (req, res) {
         me.emit('logEntry', req.body.data);
         res.status(200).end();
