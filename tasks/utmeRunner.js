@@ -20,7 +20,7 @@ module.exports = function(grunt) {
         var appServer = getOption('appServer') || "http://localhost:9000/";
         var phantom = new require('phantom-as-promise').PhantomAsPromise({
             parameters: {
-                'remote-debugger-port': 9099
+                //'remote-debugger-port': 9099
             }
         });
         var scenarioToRun = grunt.option( "scenario" );
@@ -147,6 +147,25 @@ module.exports = function(grunt) {
                                 page.evaluate(function() {
                                     localStorage.clear();
                                 });
+                                page.onError = function(msg, trace) {
+                                    grunt.log.error(msg);
+                                    if (trace) {
+                                        try {
+                                            grunt.log.error(JSON.stringify(trace));
+                                        } catch (e) {
+
+                                        }
+                                    }
+                                };
+
+                                page.onNavigationRequested = function(url, type, willNavigate, main) {
+                                    grunt.log.ok('navigating to ' + url);
+                                };
+
+                                page.onConsoleMessage = function(msg, lineNum, sourceId) {
+                                    grunt.log.ok('CONSOLE: ' + msg);
+                                };
+
                                 return phantom.clearCookies().then(function() {
                                     return page.open(appServer + "?utme_scenario=" + scenario.name + "&utme_test_server=" + testServer);
                                 });
