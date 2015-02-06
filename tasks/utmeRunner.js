@@ -19,7 +19,9 @@ module.exports = function(grunt) {
         var testServer = "http://localhost:" + port + "/";
         var appServer = getOption('appServer') || "http://localhost:9000/";
         var phantom = new require('phantom-as-promise').PhantomAsPromise({
-            'remote-debugger-port': 9099
+            parameters: {
+                'remote-debugger-port': 9099
+            }
         });
         var scenarioToRun = grunt.option( "scenario" );
         var thisPage;
