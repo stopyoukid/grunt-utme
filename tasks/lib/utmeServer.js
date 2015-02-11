@@ -28,10 +28,9 @@ function Server(port, callback) {
     }));
 
     app.get("/settings", function (req, res) {
-        res.status(200).end();
-        me.emit('loadSettings', req.params.name, function (settings) {
+        me.emit('loadSettings', function (settings) {
             if (settings) {
-                res.body(settings).end();
+                res.json(settings).end();
             } else {
                 res.status(404).end();
             }

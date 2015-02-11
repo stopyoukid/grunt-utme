@@ -2,9 +2,92 @@
 var _ = require("lodash");
 var utmeServer = require("./lib/utmeServer");
 var Promise = require('es6-promise').Promise;
+var path = require("path");
+
+var serverDefaultOptions = {
+    port: 9043,
+    appServer: "http://localhost:9000/",
+    configFile: "utme.config.json",
+    runner: {
+        speed: 'realtime',
+        events: {
+            click: true,
+            focus: true,
+            blur: true,
+            dblclick: true,
+            mousedown: true,
+            mouseenter: true,
+            mouseleave: true,
+            mouseout: true,
+            mouseover: true,
+            mouseup: true,
+            change: true
+        }
+    },
+    recorder: {
+        events: {
+            click: true,
+            focus: true,
+            blur: true,
+            dblclick: true,
+            mousedown: true,
+            mouseenter: true,
+            mouseleave: true,
+            mouseout: true,
+            mouseover: true,
+            mouseup: true,
+            change: true
+        }
+    }
+};
+
+var runnerDefaultOptions = _.extend(_.extend({}, serverDefaultOptions), {
+    port: 9045
+});
+
+var publicOptions = [
+    "verbose",
+    "runner",
+    "recorder"
+];
+
+function flattenSettings(settings, output, baseKeyPath) {
+    output = output || {};
+    baseKeyPath = baseKeyPath || '';
+    if (baseKeyPath) {
+        baseKeyPath += '.';
+    }
+    for (var key in settings) {
+        var keyPath = baseKeyPath + key;
+        if (settings.hasOwnProperty(key)) {
+            if (settings[key] instanceof Array || typeof settings[key] !== 'object') {
+                output[keyPath] = settings[key];
+            } else {
+                flattenSettings(settings[key], output, keyPath);
+            }
+        }
+    }
+    return output;
+}
 
 // TODO: Get rid of this trash as soon as we can
 module.exports = function(grunt) {
+
+    function loadOptions(defaultOptions, userOptions) {
+        var options = _.extend({}, defaultOptions);
+        if (userOptions.configFile) {
+            _.extend(options, loadConfigFile(userOptions.configFile));
+        }
+        return _.extend(options, userOptions);
+    }
+
+    function loadConfigFile(configFile) {
+        var configPath = path.resolve(configFile);
+        if (configPath) {
+            return grunt.file.readJSON(configPath);
+        }
+        return {};
+    }
 
     grunt.registerMultiTask("utmeTestRunner", 'Runs utme scenarios', function() {
         var me = this;
@@ -14,25 +97,21 @@ module.exports = function(grunt) {
         var scenarioPromise;
         var resolver;
         var rejecter;
-        var options = _.extend({}, this.options());
-        var port = getOption('port') || 9045;
-        var testServer = "http://localhost:" + port + "/";
-        var appServer = getOption('appServer') || "http://localhost:9000/";
+        var options = loadOptions(runnerDefaultOptions, this.options());
+        var testServer = "http://localhost:" + getOption('port') + "/";
+        var appServer = getOption('appServer');
         var phantom = new require('phantom-as-promise').PhantomAsPromise({
             parameters: {
                 //'remote-debugger-port': 9099
             }
         });
-        var scenarioToRun = grunt.option( "scenario" );
+        var scenarioToRun = grunt.option("scenario");
         var thisPage;
         var verbose = getOption('verbose');
-        var done = function() {
-            console.log = oldLog;
-            _done();
-        };
         var manualLoad = getOption('manualLoad');
         var oldLog = console.log;
         var allScenarioFiles;
+
         console.log = function () {
             var args = Array.prototype.slice.call(arguments, 0);
             if (!args[0].match || !args[0].match(/^phantom (stdout|stderr)/)) {
@@ -42,6 +121,13 @@ module.exports = function(grunt) {
 
         function startServer(port, callback) {
             serverHandler = utmeServer.createBasicServer(port, callback);
+            serverHandler.on('loadSettings', function (callback) {
+                var settings = {};
+                publicOptions.forEach(function (opt) {
+                    settings[opt] = options[opt];
+                });
+                callback(flattenSettings(settings));
+            });
             serverHandler.on('loadScenario', function (name, scenarioCallback) {
                 if (name == runningScenario.name) {
                     scenarioCallback(runningScenario);
@@ -57,14 +143,14 @@ module.exports = function(grunt) {
                     }
                 }
             });
-
             serverHandler.on('logEntry', function (data) {
                 if (data.indexOf("[SUCCESS]") >= 0) {
                     resolver(data);
                 }
-                if (verbose || data.indexOf("Could not") < 0 || data.indexOf("Validate:") == 0) {
-                    grunt.log.ok(data);
-                }
+                grunt.log.ok(data);
+            });
+            serverHandler.on('successEntry', function (data) {
+                resolver(data);
             });
             serverHandler.on('errorEntry', function(args) {
                 rejecter(args);
@@ -220,15 +306,30 @@ module.exports = function(grunt) {
             }
             return (me.options() || {})[name];
         }
+
+        function done() {
+            console.log = oldLog;
+            _done();
+        }
     });
 
     grunt.registerMultiTask("utmeServer", 'Starts a server for persisting and loading scenarios', function() {
         // throw new Error("lkajsdlgkjsagd");
         var _done = this.async();
-        var options = _.extend({}, this.options());
+        var options = loadOptions(serverDefaultOptions, this.options());
         var port = options.port || 9043;
-        utmeServer.createScenarioServer(port, function() {
+        var server = utmeServer.createScenarioServer(port, function() {
             grunt.log.ok("Started utme server at: " + port);
         }, options.directory);
+
+        server.on('loadSettings', function (callback) {
+            var settings = {};
+            publicOptions.forEach(function (opt) {
+                settings[opt] = options[opt];
+            });
+            if (callback) {
+                callback(flattenSettings(settings));
+            }
+        });
     });
 };
