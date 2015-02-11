@@ -155,8 +155,11 @@ module.exports = function(grunt) {
             serverHandler.on('successEntry', function (data) {
                 if (resolver) {
                     resolver(data);
+                } else {
+                    grunt.log.error("resolver is null!");
+                    stopServer();
                 }
-                grunt.log.writeln(data + ''.green);
+                grunt.log.writeln((data + '\n').green);
             });
             serverHandler.on('errorEntry', function(args) {
                 if (rejecter) {
@@ -235,7 +238,7 @@ module.exports = function(grunt) {
                         return;
                     }
 
-                    grunt.log.ok("Attempting to run " + scenario.name);
+                    grunt.log.ok(("\n" + scenario.name).bold);
                     grunt.log.ok(testServer);
 
                     if (!options || !manualLoad) {
@@ -266,7 +269,9 @@ module.exports = function(grunt) {
                                 };
 
                                 page.onConsoleMessage = function(msg, lineNum, sourceId) {
-                                    grunt.log.ok('CONSOLE: ' + msg);
+                                    if (options.consoleLogging) {
+                                        grunt.log.ok('CONSOLE: ' + msg);
+                                    }
                                 };
 
                                 return phantom.clearCookies().then(function() {
@@ -277,13 +282,21 @@ module.exports = function(grunt) {
                                 return scenarioPromise;
                             })
                             .then(runNextOrStop)
-                            .catch(runNextOrStop);
+                            .catch(function () {
+                                //grunt.log.ok("Rendering page");
+                                //thisPage.render("test.png");
+                                runNextOrStop();
+                            });
                     } else {
                         console.log("Go To: " + appServer + "?utme_scenario=" + scenario.name + "&utme_test_server=" + testServer);
                         setupServerForScenario(scenario);
                         scenarioPromise
                             .then(runNextOrStop)
-                            .catch(runNextOrStop);
+                            .catch(function () {
+                                //grunt.log.ok("Rendering page");
+                                //thisPage.render("test.png");
+                                runNextOrStop();
+                            });
                     }
                 }
 
