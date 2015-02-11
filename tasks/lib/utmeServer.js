@@ -45,6 +45,10 @@ function Server(port, callback) {
         me.emit('errorEntry', req.body.data);
         res.status(200).end();
     });
+    app.post("/success", function (req, res) {
+        me.emit('successEntry', req.body.data);
+        res.status(200).end();
+    });
 
     app.get("/scenario/:name", function (req, res) {
         me.emit('loadScenario', req.params.name, function (scenario) {

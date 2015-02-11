@@ -8,6 +8,7 @@ var serverDefaultOptions = {
     port: 9043,
     appServer: "http://localhost:9000/",
     configFile: "utme.config.json",
+    consoleLogging: true,
     runner: {
         speed: 'realtime',
         events: {
@@ -42,11 +43,16 @@ var serverDefaultOptions = {
 };
 
 var runnerDefaultOptions = _.extend(_.extend({}, serverDefaultOptions), {
-    port: 9045
+    consoleLogging: false,
+    port: 9045,
+    runner: _.extend(_.extend({}, serverDefaultOptions), {
+        speed: 'realtime'
+    })
 });
 
 var publicOptions = [
     "verbose",
+    "consoleLogging",
     "runner",
     "recorder"
 ];
@@ -144,16 +150,18 @@ module.exports = function(grunt) {
                 }
             });
             serverHandler.on('logEntry', function (data) {
-                if (data.indexOf("[SUCCESS]") >= 0) {
-                    resolver(data);
-                }
                 grunt.log.ok(data);
             });
             serverHandler.on('successEntry', function (data) {
-                resolver(data);
+                if (resolver) {
+                    resolver(data);
+                }
+                grunt.log.writeln(data + ''.green);
             });
             serverHandler.on('errorEntry', function(args) {
-                rejecter(args);
+                if (rejecter) {
+                    rejecter(args);
+                }
             });
         }
 
@@ -191,6 +199,7 @@ module.exports = function(grunt) {
 
             var results = [];
             var hasError = false;
+            var port = getOption('port');
             startServer(port, function() {
                 grunt.log.ok("Started utme test server at: " + port);
                 function runNextOrStop(lastRunInfo) {
@@ -218,9 +227,17 @@ module.exports = function(grunt) {
 
                 function runScenario(scenarioFile) {
                     var scenario = grunt.file.readJSON(scenarioFile);
+
+                    if (scenario.abstract === true) {
+                        setTimeout(function () {
+                            runNextOrStop();
+                        });
+                        return;
+                    }
+
                     grunt.log.ok("Attempting to run " + scenario.name);
                     grunt.log.ok(testServer);
-                    // grunt.log.ok("Loading Scenario '" + scenario.name + "'");
+
                     if (!options || !manualLoad) {
                         phantom.page()
                             .then(function (page) {
