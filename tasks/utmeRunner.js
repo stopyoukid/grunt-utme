@@ -120,7 +120,7 @@ module.exports = function(grunt) {
 
         console.log = function () {
             var args = Array.prototype.slice.call(arguments, 0);
-            if (!args[0].match || !args[0].match(/^phantom (stdout|stderr)/)) {
+            if (args[0] && !args[0].match || !args[0].match(/^phantom (stdout|stderr)/)) {
                 oldLog.apply(this, args);
             }
         };
@@ -193,7 +193,9 @@ module.exports = function(grunt) {
 
         allScenarioFiles = grunt.file.expand(this.filesSrc[0] + "**/*.{scenario, json}");
         if (allScenarioFiles.length > 0) {
-            var files = allScenarioFiles;
+
+            // Make a copy, so we don't modify the underlying array
+            var files = allScenarioFiles.slice(0);
             if (scenarioToRun) {
                 files = files.filter(function (file) {
                     return file.endsWith(scenarioToRun + ".scenario");
